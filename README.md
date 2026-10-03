@@ -74,4 +74,4 @@ Configuration fields:
 
 Run `npm test` to build and check validation and both MCP transports.
 
-Run `npm run examples` to evaluate every `.drawio` file in a local `Examples/` directory. Example diagrams and generated `example-mcp-findings` reports are excluded from Git. The command prints a finding summary per file and exits with status 1 if any diagram has errors. Use `npm run examples -- --json` for full findings and cell IDs. The diagram type is inferred from `Context` or `Container` in each filename.
+Run `npm run examples` to evaluate every `.drawio` file in a local `Examples/` directory. Example diagrams and generated `example-mcp-findings` reports are excluded from Git. The command prints a finding summary per file and exits with status 1 if any diagram has errors. Use `npm run examples -- --json` for full findings and cell IDs. The diagram type is inferred from `Context` or `Container` in each filename; use `--type <id>` to override it. `npm run report:examples -- --type <id>` accepts the same override.

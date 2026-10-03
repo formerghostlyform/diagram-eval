@@ -1,17 +1,21 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { exampleTypeOverride, inferExampleType } from '../dist/src/example-type.js';
 
+const projectRoot = fileURLToPath(new URL('../', import.meta.url));
+const examplesDirectory = resolve(projectRoot, 'Examples');
+const typeOverride = exampleTypeOverride(process.argv.slice(2));
 const client = new Client({ name: 'diagram-eval-example-report', version: '1.0.0' });
-const transport = new StdioClientTransport({ command: process.execPath, args: [resolve('dist/src/server.js')] });
+const transport = new StdioClientTransport({ command: process.execPath, args: [resolve(projectRoot, 'dist/src/server.js')] });
 const results = [];
 try {
   await client.connect(transport);
-  for (const name of readdirSync('Examples').filter(name => name.toLowerCase().endsWith('.drawio')).sort()) {
-    const diagram_type = /context/i.test(name) ? 'c4-context' : /container/i.test(name) ? 'c4-container' : undefined;
-    if (!diagram_type) throw new Error(`Cannot infer diagram type from example: ${name}`);
-    const diagram_xml = readFileSync(resolve('Examples', name), 'utf8');
+  for (const name of readdirSync(examplesDirectory).filter(name => name.toLowerCase().endsWith('.drawio')).sort()) {
+    const diagram_type = inferExampleType(name, typeOverride);
+    const diagram_xml = readFileSync(resolve(examplesDirectory, name), 'utf8');
     const response = await client.callTool({ name: 'evaluate_diagram', arguments: { diagram_type, diagram_xml } });
     if (response.isError || !response.structuredContent) throw new Error(`MCP evaluation failed for ${name}`);
     results.push({ name, result: response.structuredContent });
@@ -20,7 +24,7 @@ try {
   await client.close();
 }
 
-writeFileSync('example-mcp-findings.json', `${JSON.stringify(results, null, 2)}\n`);
+writeFileSync(resolve(projectRoot, 'example-mcp-findings.json'), `${JSON.stringify(results, null, 2)}\n`);
 const lines = ['# Example diagram findings from MCP', '',
   'Each result below came from an `evaluate_diagram` MCP tool call.', ''];
 for (const { name, result } of results) {
@@ -44,5 +48,5 @@ for (const { name, result } of results) {
   }
   if (result.findings.length) lines.push('');
 }
-writeFileSync('example-mcp-findings.md', `${lines.join('\n')}\n`);
+writeFileSync(resolve(projectRoot, 'example-mcp-findings.md'), `${lines.join('\n')}\n`);
 console.log(`Wrote MCP findings for ${results.length} diagrams.`);

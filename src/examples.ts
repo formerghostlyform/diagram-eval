@@ -3,18 +3,17 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { evaluateDiagram } from './evaluate.js';
 import { TypeRegistry } from './library.js';
+import { exampleTypeOverride, inferExampleType } from './example-type.js';
 
 const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
 const examplesDirectory = resolve(projectRoot, 'Examples');
 const registry = new TypeRegistry(projectRoot);
+const typeOverride = exampleTypeOverride(process.argv.slice(2));
 const results = readdirSync(examplesDirectory)
   .filter(name => name.toLowerCase().endsWith('.drawio'))
   .sort()
   .map(name => {
-    const diagramType = /context/i.test(name) ? 'c4-context'
-      : /container/i.test(name) ? 'c4-container'
-      : undefined;
-    if (!diagramType) throw new Error(`Cannot infer diagram type from example: ${name}`);
+    const diagramType = inferExampleType(name, typeOverride);
     const xml = readFileSync(resolve(examplesDirectory, name), 'utf8');
     return { name, result: evaluateDiagram(registry, diagramType, xml) };
   });
