@@ -201,7 +201,7 @@ function findRequiredGroup(graph: Graph, entry: LibraryEntry, consumed: Set<stri
 function matchTitleBlock(type: DiagramType, candidate: Cell, graph: Graph): Set<string> | null {
   const referenceLabel = [type.titleBlock.root, ...descendants(type.titleBlock.graph, type.titleBlock.root.id)]
     .map(cell => cell.wrapper.getAttribute('label')).find(label => label?.includes('%'));
-  if (!referenceLabel) throw new Error(`${type.id}: Title Block has no metadata label.`);
+  if (!referenceLabel) return null;
   const allowedLabels = new Set([referenceLabel]);
   for (const field of type.config.optionalTitleFields) {
     for (const label of [...allowedLabels]) allowedLabels.add(label.replace(`_%${field}%`, ''));
@@ -213,7 +213,7 @@ function matchTitleBlock(type: DiagramType, candidate: Cell, graph: Graph): Set<
 function checkTitleFields(type: DiagramType, matched: Cell[], findings: Finding[]): void {
   const reference = [type.titleBlock.root, ...descendants(type.titleBlock.graph, type.titleBlock.root.id)]
     .find(cell => /%[A-Za-z][A-Za-z0-9_]*%/.test(cell.wrapper.getAttribute('label') ?? ''));
-  if (!reference) throw new Error(`${type.id}: Title Block has no metadata label.`);
+  if (!reference) return;
   const actual = matched.find(cell => /%[A-Za-z][A-Za-z0-9_]*%/.test(cell.wrapper.getAttribute('label') ?? ''));
   if (!actual) throw new Error(`${type.id}: matched Title Block has no metadata label.`);
   const fields = [...new Set([...(actual.wrapper.getAttribute('label') ?? '').matchAll(/%([A-Za-z][A-Za-z0-9_]*)%/g)].map(match => match[1]!))];
@@ -383,16 +383,12 @@ export function evaluateDiagram(registry: TypeRegistry, diagramType: string, dia
   if (!type) {
     return finish(diagramType, [finding('error', 'UNKNOWN_DIAGRAM_TYPE', `Unknown diagram type: ${diagramType}.`)]);
   }
-  let graph: Graph;
+  let graph: Graph | undefined;
   try {
     graph = parseDiagramContent(diagramXml);
-  } catch (error) {
-    if (error instanceof InputError) return finish(diagramType, [finding('error', error.code, error.message)]);
-    throw error;
-  }
   const consumed = new Set<string>();
-  findRequiredGroup(graph, type.key, consumed, findings, 'KEY', candidate => matchGroup(type.key, candidate, graph));
-  const titleGroups = findRequiredGroup(graph, type.titleBlock, consumed, findings, 'TITLE_BLOCK', candidate => matchTitleBlock(type, candidate, graph));
+  findRequiredGroup(graph, type.key, consumed, findings, 'KEY', candidate => matchGroup(type.key, candidate, graph!));
+  const titleGroups = findRequiredGroup(graph, type.titleBlock, consumed, findings, 'TITLE_BLOCK', candidate => matchTitleBlock(type, candidate, graph!));
   for (const group of titleGroups) checkTitleFields(type, group, findings);
 
   const ordinaryEntries = type.entries.filter(entry =>
@@ -435,5 +431,10 @@ export function evaluateDiagram(registry: TypeRegistry, diagramType: string, dia
     }
   }
   checkConnectors(graph, type, consumed, findings);
-  return finish(diagramType, findings, graph);
+    return finish(diagramType, findings, graph);
+  } catch (error) {
+    if (error instanceof InputError) return finish(diagramType, [finding('error', error.code, error.message)], graph);
+    console.error(error);
+    return finish(diagramType, [finding('error', 'INTERNAL_ERROR', 'An internal error occurred while evaluating the diagram.')], graph);
+  }
 }

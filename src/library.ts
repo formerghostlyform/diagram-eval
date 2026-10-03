@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod/v4';
-import { Cell, decodeLibraryXml, Graph, parseGraph, parseXml } from './xml.js';
+import { Cell, decodeLibraryXml, descendants, Graph, parseGraph, parseXml } from './xml.js';
 
 const typeSchema = z.record(z.string().min(1), z.object({
   library: z.string().min(1),
@@ -48,6 +48,9 @@ export class TypeRegistry {
         throw new Error(`${id}: duplicate warning entry is missing or ambiguous.`);
       }
       const titleBlock = find('Title Block');
+      const hasMetadataLabel = [titleBlock.root, ...descendants(titleBlock.graph, titleBlock.root.id)]
+        .some(cell => /%[A-Za-z][A-Za-z0-9_]*%/.test(cell.wrapper.getAttribute('label') ?? ''));
+      if (!hasMetadataLabel) throw new Error(`${id}: Title Block has no metadata label.`);
       for (const stretchId of definition.titleStretchIds) {
         if (!titleBlock.graph.byId.has(stretchId)) throw new Error(`${id}: unknown Title Block stretch ID ${stretchId}.`);
       }
