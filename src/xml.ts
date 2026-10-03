@@ -26,6 +26,7 @@ export interface Graph {
 }
 
 const MAX_XML_BYTES = 20 * 1024 * 1024;
+export const MAX_DEPTH = 100;
 
 export function elementChildren(element: Element): Element[] {
   const result: Element[] = [];
@@ -141,13 +142,23 @@ export function parseGraph(model: Element): Graph {
       children.set(cell.parent, siblings);
     }
   }
+  const depths = new Map<string, number>();
   for (const cell of cells) {
-    const seen = new Set<string>();
+    if (depths.has(cell.id)) continue;
+    const path: Cell[] = [];
+    const visiting = new Set<string>();
     let cursor: Cell | undefined = cell;
-    while (cursor?.parent) {
-      if (seen.has(cursor.id)) throw new InputError('MALFORMED_XML', 'Cell parent cycle detected.');
-      seen.add(cursor.id);
-      cursor = byId.get(cursor.parent);
+    while (cursor && !depths.has(cursor.id)) {
+      if (visiting.has(cursor.id)) throw new InputError('MALFORMED_XML', 'Cell parent cycle detected.');
+      visiting.add(cursor.id);
+      path.push(cursor);
+      cursor = cursor.parent ? byId.get(cursor.parent) : undefined;
+    }
+    let depth = cursor ? depths.get(cursor.id)! : -1;
+    for (let index = path.length - 1; index >= 0; index--) {
+      depth++;
+      if (depth > MAX_DEPTH) throw new InputError('TOO_DEEP', `Cell nesting exceeds ${MAX_DEPTH} levels.`);
+      depths.set(path[index]!.id, depth);
     }
   }
   return { cells, byId, children };
@@ -165,12 +176,12 @@ export function decodeLibraryXml(encoded: string): string {
 
 export function descendants(graph: Graph, rootId: string): Cell[] {
   const result: Cell[] = [];
-  const visit = (id: string): void => {
-    for (const child of graph.children.get(id) ?? []) {
-      result.push(child);
-      visit(child.id);
-    }
-  };
-  visit(rootId);
+  const pending = [...(graph.children.get(rootId) ?? [])].reverse();
+  while (pending.length) {
+    const cell = pending.pop()!;
+    result.push(cell);
+    const children = graph.children.get(cell.id) ?? [];
+    for (let index = children.length - 1; index >= 0; index--) pending.push(children[index]!);
+  }
   return result;
 }
