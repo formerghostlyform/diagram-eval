@@ -269,7 +269,7 @@ test('rejects nonstandard, two-headed, and opposite-direction arrows', () => {
   fixture.cell('arrow-2').setAttribute('style', `${fixture.cell('arrow-2').getAttribute('style')}startArrow=blockThin;`);
   const first = codes('c4-context', fixture.xml());
   assert.ok(first.includes('TWO_HEADED_ARROW'));
-  assert.ok(first.includes('NONSTANDARD_CONNECTOR'));
+  assert.ok(!first.includes('NONSTANDARD_CONNECTOR'));
   const second = validContext();
   second.add('Arrow', 'reverse', { source: 'system-2', target: 'person-2' });
   assert.ok(codes('c4-context', second.xml()).includes('BIDIRECTIONAL_CONNECTION'));

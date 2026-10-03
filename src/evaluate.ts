@@ -41,6 +41,17 @@ export interface EvaluationResult {
 }
 
 const CONNECTOR_STYLE_KEYS = ['strokeWidth', 'strokeColor', 'startArrow', 'endArrow'] as const;
+const EDGE_STYLE_DEFAULTS = {
+  endArrow: 'classic', startArrow: 'none', strokeWidth: '1', endFill: '1', startFill: '1', endSize: '6', startSize: '6',
+} as const;
+
+function normalizeEdgeStyle(style: Map<string, string>): Map<string, string> {
+  const normalized = new Map(style);
+  for (const [key, value] of Object.entries(EDGE_STYLE_DEFAULTS)) {
+    if (!normalized.has(key)) normalized.set(key, value);
+  }
+  return normalized;
+}
 
 function finding(severity: Severity, code: string, message: string, cellIds: string[] = [],
   expectedEntry?: string, differences?: FindingDifference[]): Finding {
@@ -316,13 +327,13 @@ function isStructuralGroup(cell: Cell, graph: Graph): boolean {
 }
 
 function connectorDifferences(template: Cell, actual: Cell): FindingDifference[] {
-  const expected = styleMap(template.inner.getAttribute('style') ?? '');
-  const received = styleMap(actual.inner.getAttribute('style') ?? '');
+  const expected = normalizeEdgeStyle(styleMap(template.inner.getAttribute('style') ?? ''));
+  const received = normalizeEdgeStyle(styleMap(actual.inner.getAttribute('style') ?? ''));
   const result: FindingDifference[] = [];
   const keys: string[] = [...CONNECTOR_STYLE_KEYS];
   for (const side of ['start', 'end']) {
     const arrow = `${side}Arrow`;
-    if ((expected.get(arrow) ?? 'none') !== 'none' || (received.get(arrow) ?? 'none') !== 'none') {
+    if (expected.get(arrow) !== 'none' || received.get(arrow) !== 'none') {
       keys.push(`${side}Fill`, `${side}Size`);
     }
   }
@@ -331,10 +342,8 @@ function connectorDifferences(template: Cell, actual: Cell): FindingDifference[]
     const right = received.get(key);
     const same = key === 'strokeColor' ? left?.toLowerCase() === right?.toLowerCase()
       : key === 'strokeWidth' || key === 'startSize' || key === 'endSize'
-        ? left === right || (left !== undefined && right !== undefined && Number(left) === Number(right))
-        : key === 'startArrow' || key === 'endArrow'
-          ? (left ?? 'none') === (right ?? 'none')
-          : left === right;
+        ? Number(left) === Number(right)
+        : left === right;
     if (!same) result.push(difference(`style.${key}`, left, right, actual.id));
   }
   return result;
@@ -352,13 +361,16 @@ function checkConnectors(graph: Graph, type: DiagramType, consumed: Set<string>,
       findings.push(finding('error', 'INVALID_CONNECTION_ENDPOINT', 'Connector references a missing or non-shape endpoint.',
         [edge.id, ...badEndpoints], 'Arrow', badEndpoints.map(id => difference('endpoint', 'existing shape', id, edge.id))));
     }
-    const start = styleValue(edge, 'startArrow');
-    const end = styleValue(edge, 'endArrow');
-    if (start && start !== 'none' && end && end !== 'none') {
+    const normalizedStyle = normalizeEdgeStyle(styleMap(edge.inner.getAttribute('style') ?? ''));
+    const start = normalizedStyle.get('startArrow')!;
+    const end = normalizedStyle.get('endArrow')!;
+    const twoHeaded = start !== 'none' && end !== 'none';
+    if (twoHeaded) {
       findings.push(finding('error', 'TWO_HEADED_ARROW', 'Connector has arrowheads at both ends.', [edge.id],
         'Arrow', [difference('style.startArrow', 'none', start, edge.id), difference('style.endArrow', 'one arrowhead', end, edge.id)]));
     }
-    const styleDifferences = connectorDifferences(type.arrow.root, edge);
+    const styleDifferences = connectorDifferences(type.arrow.root, edge)
+      .filter(item => !twoHeaded || item.property !== 'style.startArrow');
     if (styleDifferences.length) {
       findings.push(finding('error', 'NONSTANDARD_CONNECTOR', 'Connector differs from the library Arrow weight, color, or arrowhead style.',
         [edge.id], 'Arrow', styleDifferences));
