@@ -15,7 +15,9 @@ test('MCP tools work over stdio', async () => {
     await client.connect(transport);
     const list = await client.listTools();
     assert.deepEqual(list.tools.map(tool => tool.name).sort(), ['evaluate_diagram', 'list_diagram_types']);
-    assert.ok(list.tools.find(tool => tool.name === 'evaluate_diagram')?.outputSchema);
+    const outputSchema = list.tools.find(tool => tool.name === 'evaluate_diagram')?.outputSchema;
+    assert.ok(outputSchema);
+    assert.ok((outputSchema as { required?: string[] }).required?.includes('evaluated_at'));
     const emptyModel = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>';
     const result = await client.callTool({ name: 'evaluate_diagram', arguments: {
       diagram_type: 'c4-context',
@@ -23,11 +25,13 @@ test('MCP tools work over stdio', async () => {
     } });
     const structured = result.structuredContent as {
       diagram_type: string;
+      evaluated_at: string;
       valid: boolean;
       summary: { passed_checks: string[]; error_count: number; warning_count: number };
       findings: { severity: string; code: string; message: string; cell_ids: string[]; elements: unknown[] }[];
     };
     assert.equal(structured.diagram_type, 'c4-context');
+    assert.equal(new Date(structured.evaluated_at).toISOString(), structured.evaluated_at);
     assert.equal(structured.valid, false);
     assert.deepEqual(structured.summary, {
       passed_checks: ['Diagram parsed', 'One diagram page', 'Library shapes conform', 'Connector appearance conforms',
@@ -46,9 +50,17 @@ test('MCP tools work over stdio', async () => {
       diagram_xml: `<mxfile><diagram>${emptyModel}</diagram><diagram>${emptyModel}</diagram></mxfile>`,
     } });
     const multiPageResult = multiPage.structuredContent as typeof structured;
+    assert.equal(new Date(multiPageResult.evaluated_at).toISOString(), multiPageResult.evaluated_at);
     assert.equal(multiPageResult.summary.warning_count, 1);
     assert.deepEqual(multiPageResult.findings.map(item => [item.severity, item.code]),
       [['error', 'MISSING_KEY'], ['error', 'MISSING_TITLE_BLOCK'], ['warning', 'MULTI_PAGE']]);
+
+    const unknown = await client.callTool({ name: 'evaluate_diagram', arguments: {
+      diagram_type: 'missing', diagram_xml: emptyModel,
+    } });
+    const unknownResult = unknown.structuredContent as typeof structured;
+    assert.equal(new Date(unknownResult.evaluated_at).toISOString(), unknownResult.evaluated_at);
+    assert.deepEqual(unknownResult.findings.map(item => item.code), ['UNKNOWN_DIAGRAM_TYPE']);
   } finally {
     await client.close();
   }

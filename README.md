@@ -30,6 +30,7 @@ The tool advertises this output schema and returns it in both MCP `structuredCon
 ```json
 {
   "diagram_type": "c4-context",
+  "evaluated_at": "2026-10-03T14:25:30.123Z",
   "valid": false,
   "summary": {
     "passed_checks": ["Diagram parsed", "One diagram page", "One intact Key", "One intact Title Block with filled metadata"],
@@ -50,7 +51,7 @@ The tool advertises this output schema and returns it in both MCP `structuredCon
 }
 ```
 
-The `summary` lists checks that completed without findings before the detailed failures and warnings, plus counts for each severity. It lists no passed checks when the diagram type is unknown or input cannot be fully evaluated. The `findings` array contains every issue detected by the configured rules, with one entry per finding. `elements` gives the cell ID, readable name and type when available, parent ID, geometry, and connector endpoint IDs and names. Geometry coordinates may be relative to the parent group. `expected_library_entry` and `differences` identify the closest library template and mismatched properties when possible. `cell_ids` is deprecated in favor of `elements`. An error makes `valid` false; warnings alone keep it true. Malformed input and unknown types are returned as evaluation findings so callers receive the same result shape; malformed XML cannot be checked further.
+`evaluated_at` is the UTC time when the evaluation completed, in ISO 8601 format. It is present on successful and failed evaluations. The `summary` lists checks that completed without findings before the detailed failures and warnings, plus counts for each severity. It lists no passed checks when the diagram type is unknown or input cannot be fully evaluated. The `findings` array contains every issue detected by the configured rules, with one entry per finding. `elements` gives the cell ID, readable name and type when available, parent ID, geometry, and connector endpoint IDs and names. Geometry coordinates may be relative to the parent group. `expected_library_entry` and `differences` identify the closest library template and mismatched properties when possible. `cell_ids` is deprecated in favor of `elements`. An error makes `valid` false; warnings alone keep it true. Malformed input and unknown types are returned as evaluation findings so callers receive the same result shape; malformed XML cannot be checked further.
 
 ## Rules
 

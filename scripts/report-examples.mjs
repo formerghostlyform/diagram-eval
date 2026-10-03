@@ -31,7 +31,8 @@ for (const { name, result } of results) {
   const errors = result.findings.filter(item => item.severity === 'error').length;
   const warnings = result.findings.length - errors;
   lines.push(`## ${name}`, '',
-    `Type: \`${result.diagram_type}\` · ${result.valid ? 'PASS' : 'FAIL'} · ${errors} errors · ${warnings} warnings`, '');
+    `Type: \`${result.diagram_type}\` · ${result.valid ? 'PASS' : 'FAIL'} · ${errors} errors · ${warnings} warnings`,
+    `Evaluated at: \`${result.evaluated_at}\` (UTC)`, '');
   lines.push(`### Passed checks (${result.summary.passed_checks.length})`, '');
   for (const check of result.summary.passed_checks) lines.push(`- ${check}`);
   if (!result.summary.passed_checks.length) lines.push('None.');

@@ -35,6 +35,7 @@ export interface Finding {
 
 export interface EvaluationResult {
   diagram_type: string;
+  evaluated_at: string;
   valid: boolean;
   summary: {
     passed_checks: string[];
@@ -106,6 +107,7 @@ export function finish(diagramType: string, findings: Finding[], graph?: Graph, 
   const errorCount = findings.filter(item => item.severity === 'error').length;
   return {
     diagram_type: diagramType,
+    evaluated_at: new Date().toISOString(),
     valid: errorCount === 0,
     summary: { passed_checks: passedChecks, error_count: errorCount, warning_count: findings.length - errorCount },
     findings,

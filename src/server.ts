@@ -10,6 +10,7 @@ import { evaluateDiagram } from './evaluate.js';
 const registry = new TypeRegistry();
 const evaluationOutputSchema = z.object({
   diagram_type: z.string(),
+  evaluated_at: z.iso.datetime().describe('UTC time when the evaluation completed.'),
   valid: z.boolean(),
   summary: z.object({
     passed_checks: z.array(z.string()),
