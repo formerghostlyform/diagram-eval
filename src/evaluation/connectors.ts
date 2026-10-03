@@ -60,7 +60,7 @@ export function checkConnectors(graph: Graph, type: DiagramType, consumed: Set<s
         'Arrow', [difference('style.startArrow', 'none', start, edge.id), difference('style.endArrow', 'one arrowhead', end, edge.id)]));
     }
     const styleDifferences = connectorDifferences(type.arrow.root, edge)
-      .filter(item => !(twoHeaded && type.config.forbidTwoHeaded) || item.property !== 'style.startArrow');
+      .filter(item => !twoHeaded || item.property !== 'style.startArrow');
     if (styleDifferences.length) {
       findings.push(finding('error', 'NONSTANDARD_CONNECTOR', 'Connector differs from the library Arrow weight, color, or arrowhead style.',
         [edge.id], 'Arrow', styleDifferences));

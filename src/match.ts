@@ -55,7 +55,10 @@ export function shapeIdentity(cell: Cell): string {
 }
 
 export function isTextLabel(cell: Cell): boolean {
-  return cell.vertex && ['text', 'edgeLabel'].includes(shapeIdentity(cell));
+  if (!cell.vertex) return false;
+  const style = styleMap(cell.inner.getAttribute('style') ?? '');
+  return ['text', 'edgeLabel'].includes(shapeIdentity(cell)) &&
+    ![...style.keys()].some(key => /^(fill|stroke|shape|image)/i.test(key));
 }
 
 function sameStyle(left: Cell, right: Cell, ignoredKeys: ReadonlySet<string>): boolean {

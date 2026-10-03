@@ -3,7 +3,7 @@ import { DiagramType, LibraryEntry } from '../library.js';
 import { hasBareStyle, matchGroup, styleMap } from '../match.js';
 import { difference, finding, type Finding, type FindingDifference } from './result.js';
 
-function closestGroup(graph: Graph, entry: LibraryEntry, consumed: Set<string>): Cell | undefined {
+function closestGroup(graph: Graph, entry: LibraryEntry, consumed: Set<string>): { cell: Cell; score: number } | undefined {
   const expectedCount = descendants(entry.graph, entry.root.id).length;
   const expectedWidth = entry.root.geometry?.getAttribute('width');
   const expectedHeight = entry.root.geometry?.getAttribute('height');
@@ -15,7 +15,7 @@ function closestGroup(graph: Graph, entry: LibraryEntry, consumed: Set<string>):
         (childCount === expectedCount ? 30 : 0) - Math.abs(childCount - expectedCount) * 5;
       return { cell, score };
     }).sort((a, b) => b.score - a.score);
-  return ranked[0] && ranked[0].score >= 60 ? ranked[0].cell : undefined;
+  return ranked[0] && ranked[0].score >= 60 ? ranked[0] : undefined;
 }
 
 function groupDifferences(graph: Graph, entry: LibraryEntry, candidate: Cell): FindingDifference[] {
@@ -58,6 +58,24 @@ function groupDifferences(graph: Graph, entry: LibraryEntry, candidate: Cell): F
   return result.slice(0, 12);
 }
 
+function matchingChildStyles(graph: Graph, entry: LibraryEntry, candidate: Cell): number {
+  const styles = new Map<string, number>();
+  for (const cell of descendants(entry.graph, entry.root.id)) {
+    const style = cell.inner.getAttribute('style') ?? '';
+    styles.set(style, (styles.get(style) ?? 0) + 1);
+  }
+  let matches = 0;
+  for (const cell of descendants(graph, candidate.id)) {
+    const style = cell.inner.getAttribute('style') ?? '';
+    const count = styles.get(style) ?? 0;
+    if (count > 0) {
+      matches++;
+      styles.set(style, count - 1);
+    }
+  }
+  return matches;
+}
+
 function findRequiredGroup(graph: Graph, entry: LibraryEntry, consumed: Set<string>, findings: Finding[], code: string, match: (candidate: Cell) => Set<string> | null): Cell[][] {
   const matches: Cell[][] = [];
   for (const candidate of graph.cells) {
@@ -67,11 +85,16 @@ function findRequiredGroup(graph: Graph, entry: LibraryEntry, consumed: Set<stri
   }
   if (matches.length === 0) {
     const candidate = closestGroup(graph, entry, consumed);
+    const differences = candidate ? groupDifferences(graph, entry, candidate.cell) : undefined;
     findings.push(finding('error', `MISSING_${code}`, `No intact ${entry.title} group was found.`,
-      candidate ? [candidate.id] : [], entry.title,
-      candidate ? groupDifferences(graph, entry, candidate) : undefined));
-    if (candidate) {
-      for (const cell of [candidate, ...descendants(graph, candidate.id)]) consumed.add(cell.id);
+      candidate ? [candidate.cell.id] : [], entry.title, differences));
+    // A close copy of a required group should not report each of its components as foreign.
+    // A structurally different group remains available for ordinary shape and connector checks.
+    const expectedChildren = descendants(entry.graph, entry.root.id).length;
+    const closeCopy = candidate && candidate.score >= 70 && differences &&
+      (differences.length <= 2 || matchingChildStyles(graph, entry, candidate.cell) >= Math.ceil(expectedChildren * 0.6));
+    if (closeCopy) {
+      for (const cell of [candidate.cell, ...descendants(graph, candidate.cell.id)]) consumed.add(cell.id);
     }
   } else {
     for (const match of matches) for (const cell of match) consumed.add(cell.id);

@@ -214,6 +214,45 @@ test('rejects a modified key group', () => {
   assert.ok(!evaluateDiagram(registry, 'c4-context', fixture.xml()).findings.some(item => item.code === 'FOREIGN_SHAPE'));
 });
 
+test('edited labels in copied required groups do not make their components foreign', () => {
+  const fixture = validContext();
+  for (const id of ['key-4', 'title-5']) {
+    const wrapper = fixture.cell(id).parentNode as Element;
+    wrapper.setAttribute('label', `${wrapper.getAttribute('label')} edited`);
+  }
+  const found = codes('c4-context', fixture.xml());
+  assert.ok(found.includes('MISSING_KEY'));
+  assert.ok(found.includes('MISSING_TITLE_BLOCK'));
+  assert.ok(!found.includes('FOREIGN_SHAPE'));
+});
+
+test('a closest group for a missing Key or Title Block does not hide its shapes and connectors', () => {
+  for (const [missingTitle, presentTitle, code] of [
+    ['Key', 'Title Block', 'MISSING_KEY'],
+    ['Title Block', 'Key', 'MISSING_TITLE_BLOCK'],
+  ] as const) {
+    const fixture = new DiagramFixture('c4-context');
+    fixture.add(presentTitle, 'required', { titleFilled: true });
+    fixture.add('Person', 'person');
+    fixture.add('System', 'system');
+    const entry = registry.types.get('c4-context')!.entries.find(item => item.title === missingTitle)!;
+    const width = entry.root.geometry!.getAttribute('width');
+    const height = entry.root.geometry!.getAttribute('height');
+    const childCount = descendants(entry.graph, entry.root.id).length;
+    assert.ok(childCount >= 2);
+    fixture.addRaw(`<mxCell id="own-group" parent="1" vertex="1" style="group"><mxGeometry as="geometry" width="${width}" height="${height}"/></mxCell>`);
+    fixture.addRaw('<mxCell id="own-shape" parent="own-group" vertex="1" style="shape=triangle;fillColor=#ff0000;"><mxGeometry as="geometry" width="50" height="50"/></mxCell>');
+    fixture.addRaw('<mxCell id="own-arrow" parent="own-group" edge="1" source="person-2" target="system-2" style="strokeWidth=2;"><mxGeometry relative="1" as="geometry"/></mxCell>');
+    for (let index = 2; index < childCount; index++) {
+      fixture.addRaw(`<mxCell id="own-extra-${index}" parent="own-group" vertex="1" style="shape=triangle;"><mxGeometry as="geometry" width="50" height="50"/></mxCell>`);
+    }
+    const findings = evaluateDiagram(registry, 'c4-context', fixture.xml()).findings;
+    assert.deepEqual(findings.find(item => item.code === code)?.cell_ids, ['own-group'], missingTitle);
+    assert.ok(findings.some(item => item.code === 'FOREIGN_SHAPE' && item.cell_ids.includes('own-shape')), missingTitle);
+    assert.ok(findings.some(item => item.code === 'NONSTANDARD_CONNECTOR' && item.cell_ids.includes('own-arrow')), missingTitle);
+  }
+});
+
 test('rejects resized and restyled library shapes', () => {
   const fixture = validContext();
   fixture.cell('system-2').getElementsByTagName('mxGeometry')[0]!.setAttribute('width', '260');
@@ -259,6 +298,17 @@ test('warns for foreign shapes and images but accepts text', () => {
   const result = evaluateDiagram(registry, 'c4-context', fixture.xml());
   assert.equal(result.valid, true);
   assert.equal(result.findings.filter(item => item.code === 'FOREIGN_SHAPE').length, 2);
+});
+
+test('text styles with visible shape properties are checked as shapes', () => {
+  const fixture = validContext();
+  fixture.addRaw('<mxCell id="plain-label" parent="1" vertex="1" style="edgeLabel;html=1;" value="note"><mxGeometry width="80" height="20" as="geometry"/></mxCell>');
+  fixture.addRaw('<mxCell id="colored-text" parent="1" vertex="1" style="text;fillColor=#ff0000;strokeColor=#000;rounded=1;" value="note"><mxGeometry width="80" height="20" as="geometry"/></mxCell>');
+  fixture.addRaw('<mxCell id="stroked-label" parent="1" vertex="1" style="edgeLabel;strokeWidth=2;" value="note"><mxGeometry width="80" height="20" as="geometry"/></mxCell>');
+  fixture.addRaw('<mxCell id="shaped-text" parent="1" vertex="1" style="text;shape=text;" value="note"><mxGeometry width="80" height="20" as="geometry"/></mxCell>');
+  const foreignIds = evaluateDiagram(registry, 'c4-context', fixture.xml()).findings
+    .filter(item => item.code === 'FOREIGN_SHAPE').flatMap(item => item.cell_ids);
+  assert.deepEqual(foreignIds.sort(), ['colored-text', 'shaped-text', 'stroked-label']);
 });
 
 test('warns for repeated context systems but not the example in the key', () => {
@@ -432,5 +482,14 @@ test('allows opposing arrows when forbidBidirectional is false', () => {
   fixture.add('Arrow', 'reverse', { source: 'system-2', target: 'person-2' });
   const localRegistry = new TypeRegistry();
   localRegistry.types.get('c4-context')!.config.forbidBidirectional = false;
+  assert.deepEqual(evaluateDiagram(localRegistry, 'c4-context', fixture.xml()).findings, []);
+});
+
+test('allows two-headed arrows when forbidTwoHeaded is false', () => {
+  const fixture = validContext();
+  const arrow = fixture.cell('arrow-2');
+  arrow.setAttribute('style', `${arrow.getAttribute('style')}startArrow=blockThin;`);
+  const localRegistry = new TypeRegistry();
+  localRegistry.types.get('c4-context')!.config.forbidTwoHeaded = false;
   assert.deepEqual(evaluateDiagram(localRegistry, 'c4-context', fixture.xml()).findings, []);
 });
