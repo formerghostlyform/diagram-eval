@@ -68,15 +68,15 @@ export function buildServer(): McpServer {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const http = args.includes('--http');
-  const portIndex = args.indexOf('--port');
-  const portText = portIndex >= 0 ? args[portIndex + 1] : process.env.PORT ?? '3000';
-  const port = Number(portText);
-  if (!Number.isInteger(port) || port < 1 || port > 65535 || (portIndex >= 0 && !http)) {
-    throw new Error('Use --http [--port 1..65535], or omit arguments for stdio.');
-  }
   if (!http) {
     await buildServer().connect(new StdioServerTransport());
     return;
+  }
+  const portIndex = args.indexOf('--port');
+  const portText = portIndex >= 0 ? args[portIndex + 1] : process.env.PORT ?? '3000';
+  const port = Number(portText);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Use --http [--port 1..65535], or omit arguments for stdio.');
   }
   const handler = createMcpHandler(buildServer, { responseMode: 'json', maxRequestBodySize: 20 * 1024 * 1024 });
   const nodeHandler = toNodeHandler(handler, { maxRequestBodySize: 20 * 1024 * 1024 });
