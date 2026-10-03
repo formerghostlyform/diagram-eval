@@ -50,7 +50,7 @@ const evaluationOutputSchema = z.object({
 });
 
 export function buildServer(): McpServer {
-  const server = new McpServer({ name: 'diagram-eval', version: '1.0.0' });
+  const server = new McpServer({ name: 'diagram-eval', version: '0.1.0' });
   server.registerTool('list_diagram_types', {
     description: 'List diagram types and their allowed library entries.',
   }, async () => {
