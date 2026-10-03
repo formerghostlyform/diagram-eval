@@ -365,12 +365,12 @@ function checkConnectors(graph: Graph, type: DiagramType, consumed: Set<string>,
     const start = normalizedStyle.get('startArrow')!;
     const end = normalizedStyle.get('endArrow')!;
     const twoHeaded = start !== 'none' && end !== 'none';
-    if (twoHeaded) {
+    if (twoHeaded && type.config.forbidTwoHeaded) {
       findings.push(finding('error', 'TWO_HEADED_ARROW', 'Connector has arrowheads at both ends.', [edge.id],
         'Arrow', [difference('style.startArrow', 'none', start, edge.id), difference('style.endArrow', 'one arrowhead', end, edge.id)]));
     }
     const styleDifferences = connectorDifferences(type.arrow.root, edge)
-      .filter(item => !twoHeaded || item.property !== 'style.startArrow');
+      .filter(item => !(twoHeaded && type.config.forbidTwoHeaded) || item.property !== 'style.startArrow');
     if (styleDifferences.length) {
       findings.push(finding('error', 'NONSTANDARD_CONNECTOR', 'Connector differs from the library Arrow weight, color, or arrowhead style.',
         [edge.id], 'Arrow', styleDifferences));
@@ -385,7 +385,7 @@ function checkConnectors(graph: Graph, type: DiagramType, consumed: Set<string>,
     }
   }
   for (const pair of directed.values()) {
-    if (pair.forward.length && pair.backward.length) {
+    if (type.config.forbidBidirectional && pair.forward.length && pair.backward.length) {
       const ids = [...pair.forward, ...pair.backward].map(cell => cell.id);
       findings.push(finding('error', 'BIDIRECTIONAL_CONNECTION', 'Shapes have connections in both directions.', ids, 'Arrow'));
     }
@@ -442,7 +442,7 @@ export function evaluateDiagram(registry: TypeRegistry, diagramType: string, dia
   if (duplicateTitle) {
     const ids = matchedByEntry.get(duplicateTitle) ?? [];
     if (ids.length > 1) {
-      findings.push(finding('warning', 'DUPLICATE_FOCUS_SYSTEM', `Found ${ids.length} instances of ${duplicateTitle}; expected at most one.`, ids, duplicateTitle));
+      findings.push(finding('warning', 'DUPLICATE_ENTRY', `Found ${ids.length} instances of ${duplicateTitle}; expected at most one.`, ids, duplicateTitle));
     }
   }
   checkConnectors(graph, type, consumed, findings);

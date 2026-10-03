@@ -45,7 +45,7 @@ The tool advertises this output schema and returns it in both MCP `structuredCon
 }
 ```
 
-The `findings` array contains every issue detected by the configured rules, with one entry per finding. `elements` gives the cell ID, readable name and type when available, parent ID, geometry, and connector endpoint IDs and names. Geometry coordinates may be relative to the parent group. `expected_library_entry` and `differences` identify the closest library template and mismatched properties when possible. `cell_ids` remains for existing clients. An error makes `valid` false; warnings alone keep it true. Malformed input and unknown types are returned as evaluation findings so callers receive the same result shape; malformed XML cannot be checked further.
+The `findings` array contains every issue detected by the configured rules, with one entry per finding. `elements` gives the cell ID, readable name and type when available, parent ID, geometry, and connector endpoint IDs and names. Geometry coordinates may be relative to the parent group. `expected_library_entry` and `differences` identify the closest library template and mismatched properties when possible. `cell_ids` is deprecated in favor of `elements`. An error makes `valid` false; warnings alone keep it true. Malformed input and unknown types are returned as evaluation findings so callers receive the same result shape; malformed XML cannot be checked further.
 
 ## Rules
 
@@ -67,6 +67,10 @@ Configuration fields:
 - `optionalTitleFields`: fields whose preceding underscore and placeholder may be omitted from the Title Block label. `c4-container` allows `ContainerName` to be omitted.
 - `titleSampleAllowedFields`: fields for which the library sample is also a legitimate final value. The supplied C4 types allow `AuthorTitle`.
 - `warnOnDuplicateEntry`: optional library entry title for a warning when more than one matching instance occurs outside the Key.
+- `forbidBidirectional`: reject opposing arrows between the same two shapes (default `true`).
+- `forbidTwoHeaded`: reject arrows with arrowheads at both ends (default `true`).
+
+**Breaking change:** the duplicate-entry warning code is now `DUPLICATE_ENTRY` instead of `DUPLICATE_FOCUS_SYSTEM`.
 
 Run `npm test` to build and check validation and both MCP transports.
 

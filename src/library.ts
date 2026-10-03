@@ -10,6 +10,8 @@ const typeSchema = z.record(z.string().min(1), z.object({
   titleStretchIds: z.array(z.string()).default([]),
   optionalTitleFields: z.array(z.string()).default([]),
   titleSampleAllowedFields: z.array(z.string()).default([]),
+  forbidBidirectional: z.boolean().default(true),
+  forbidTwoHeaded: z.boolean().default(true),
   warnOnDuplicateEntry: z.string().optional(),
 }));
 

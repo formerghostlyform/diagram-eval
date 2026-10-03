@@ -15,7 +15,7 @@ const evaluationOutputSchema = z.object({
     severity: z.enum(['error', 'warning']),
     code: z.string(),
     message: z.string(),
-    cell_ids: z.array(z.string()),
+    cell_ids: z.array(z.string()).describe('Deprecated; use elements for cell details.'),
     elements: z.array(z.object({
       cell_id: z.string(),
       kind: z.string(),

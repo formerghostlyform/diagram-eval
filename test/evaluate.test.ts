@@ -257,11 +257,11 @@ test('warns for foreign shapes and images but accepts text', () => {
 
 test('warns for repeated context systems but not the example in the key', () => {
   const one = validContext();
-  assert.ok(!codes('c4-context', one.xml()).includes('DUPLICATE_FOCUS_SYSTEM'));
+  assert.ok(!codes('c4-context', one.xml()).includes('DUPLICATE_ENTRY'));
   one.add('System', 'system-two');
   const result = evaluateDiagram(registry, 'c4-context', one.xml());
   assert.equal(result.valid, true);
-  assert.ok(result.findings.some(item => item.code === 'DUPLICATE_FOCUS_SYSTEM'));
+  assert.ok(result.findings.some(item => item.code === 'DUPLICATE_ENTRY'));
 });
 
 test('rejects nonstandard, two-headed, and opposite-direction arrows', () => {

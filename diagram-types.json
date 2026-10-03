@@ -4,6 +4,8 @@
     "labelPolicy": "fixed",
     "titleStretchIds": ["2", "3", "5"],
     "titleSampleAllowedFields": ["AuthorTitle"],
+    "forbidBidirectional": true,
+    "forbidTwoHeaded": true,
     "warnOnDuplicateEntry": "System"
   },
   "c4-container": {
@@ -11,6 +13,8 @@
     "labelPolicy": "fixed",
     "titleStretchIds": ["2", "3", "5"],
     "optionalTitleFields": ["ContainerName"],
-    "titleSampleAllowedFields": ["AuthorTitle"]
+    "titleSampleAllowedFields": ["AuthorTitle"],
+    "forbidBidirectional": true,
+    "forbidTwoHeaded": true
   }
 }
