@@ -5,7 +5,7 @@ import { XMLSerializer, type Element } from '@xmldom/xmldom';
 import { evaluateDiagram } from '../src/evaluate.js';
 import { TypeRegistry } from '../src/library.js';
 import { matchSingle } from '../src/match.js';
-import { descendants, parseGraph, parseXml } from '../src/xml.js';
+import { descendants, MAX_DEPTH, parseGraph, parseXml } from '../src/xml.js';
 
 const registry = new TypeRegistry();
 const serializer = new XMLSerializer();
@@ -323,4 +323,73 @@ test('rejects malformed and multi-page input', () => {
   assert.deepEqual(codes('c4-context', '<mxfile>'), ['MALFORMED_XML']);
   assert.deepEqual(codes('c4-context', '<mxfile><diagram/><diagram/></mxfile>'), ['MULTI_PAGE']);
   assert.deepEqual(codes('missing', validContext().xml()), ['UNKNOWN_DIAGRAM_TYPE']);
+});
+
+test('rejects DOCTYPE and ENTITY declarations as unsafe XML', () => {
+  for (const declaration of ['<!DOCTYPE mxGraphModel>', '<!ENTITY test "value">']) {
+    assert.deepEqual(codes('c4-context', `${declaration}<mxGraphModel><root/></mxGraphModel>`), ['UNSAFE_XML']);
+  }
+});
+
+test('rejects a compressed page that inflates beyond 20 MiB', () => {
+  const oversized = `<mxGraphModel><root>${'x'.repeat(20 * 1024 * 1024)}</root></mxGraphModel>`;
+  const compressed = deflateRawSync(Buffer.from(encodeURIComponent(oversized))).toString('base64');
+  const result = evaluateDiagram(registry, 'c4-context', `<mxfile><diagram>${compressed}</diagram></mxfile>`);
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.findings.map(item => item.code), ['MALFORMED_XML']);
+});
+
+test('rejects nesting deeper than MAX_DEPTH', () => {
+  const nested = Array.from({ length: MAX_DEPTH + 1 }, (_, index) =>
+    `<mxCell id="nested-${index}" parent="${index ? `nested-${index - 1}` : '1'}" vertex="1"/>`).join('');
+  const xml = `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>${nested}</root></mxGraphModel>`;
+  assert.deepEqual(codes('c4-context', xml), ['TOO_DEEP']);
+});
+
+test('rejects an arrow without a target', () => {
+  const fixture = validContext();
+  fixture.cell('arrow-2').removeAttribute('target');
+  const issue = evaluateDiagram(registry, 'c4-context', fixture.xml()).findings.find(item => item.code === 'UNCONNECTED_CONNECTOR');
+  assert.equal(issue?.expected_library_entry, 'Arrow');
+  assert.deepEqual(issue?.cell_ids, ['arrow-2']);
+});
+
+test('accepts font-size markup around part of a library shape label', () => {
+  const fixture = validContext();
+  const wrapper = fixture.cell('system-2').parentNode as Element;
+  wrapper.setAttribute('label', (wrapper.getAttribute('label') ?? '')
+    .replace('%c4Name%', '%c4<font style="font-size: 18px;">Name</font>%'));
+  assert.deepEqual(codes('c4-context', fixture.xml()), []);
+});
+
+test('uses the default end arrow when its style key is removed', () => {
+  const fixture = validContext();
+  const arrow = fixture.cell('arrow-2');
+  arrow.setAttribute('style', (arrow.getAttribute('style') ?? '').replace(/endArrow=[^;]*;/, ''));
+  const result = evaluateDiagram(registry, 'c4-context', fixture.xml());
+  const difference = result.findings.find(item => item.code === 'NONSTANDARD_CONNECTOR')?.differences
+    ?.find(item => item.property === 'style.endArrow');
+  assert.equal(difference?.actual, 'classic');
+
+  arrow.setAttribute('style', `${arrow.getAttribute('style')}startArrow=classic;`);
+  const twoHeaded = evaluateDiagram(registry, 'c4-context', fixture.xml());
+  assert.ok(twoHeaded.findings.some(item => item.code === 'TWO_HEADED_ARROW'));
+  const nonstandard = twoHeaded.findings.find(item => item.code === 'NONSTANDARD_CONNECTOR');
+  assert.ok(nonstandard);
+  assert.ok(!nonstandard.differences?.some(item => item.property === 'style.startArrow'));
+});
+
+test('accepts the default connector stroke width', () => {
+  const fixture = validContext();
+  const arrow = fixture.cell('arrow-2');
+  arrow.setAttribute('style', (arrow.getAttribute('style') ?? '').replace(/strokeWidth=[^;]*;/, ''));
+  assert.deepEqual(codes('c4-context', fixture.xml()), []);
+});
+
+test('allows opposing arrows when forbidBidirectional is false', () => {
+  const fixture = validContext();
+  fixture.add('Arrow', 'reverse', { source: 'system-2', target: 'person-2' });
+  const localRegistry = new TypeRegistry();
+  localRegistry.types.get('c4-context')!.config.forbidBidirectional = false;
+  assert.deepEqual(evaluateDiagram(localRegistry, 'c4-context', fixture.xml()).findings, []);
 });

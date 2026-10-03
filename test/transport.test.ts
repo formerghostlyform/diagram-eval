@@ -36,6 +36,21 @@ test('MCP tools work over stdio', async () => {
   }
 });
 
+test('stdio startup ignores a nonnumeric PORT environment variable', async () => {
+  const client = new Client({ name: 'diagram-eval-port-test', version: '1.0.0' });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [serverPath],
+    env: { ...process.env, PORT: 'abc' },
+  });
+  try {
+    await client.connect(transport);
+    assert.ok((await client.listTools()).tools.some(tool => tool.name === 'evaluate_diagram'));
+  } finally {
+    await client.close();
+  }
+});
+
 async function freePort(): Promise<number> {
   const server = createServer();
   await new Promise<void>(resolveReady => server.listen(0, '127.0.0.1', resolveReady));
