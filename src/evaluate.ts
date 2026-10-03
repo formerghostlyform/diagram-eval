@@ -129,11 +129,11 @@ function difference(property: string, expected: string | null | undefined,
   };
 }
 
-function closestGroup(graph: Graph, entry: LibraryEntry): Cell | undefined {
+function closestGroup(graph: Graph, entry: LibraryEntry, consumed: Set<string>): Cell | undefined {
   const expectedCount = descendants(entry.graph, entry.root.id).length;
   const expectedWidth = entry.root.geometry?.getAttribute('width');
   const expectedHeight = entry.root.geometry?.getAttribute('height');
-  const ranked = graph.cells.filter(cell => cell.vertex && hasBareStyle(cell, 'group'))
+  const ranked = graph.cells.filter(cell => cell.vertex && !consumed.has(cell.id) && hasBareStyle(cell, 'group'))
     .map(cell => {
       const childCount = descendants(graph, cell.id).length;
       const score = (cell.geometry?.getAttribute('width') === expectedWidth ? 40 : 0) +
@@ -192,7 +192,7 @@ function findRequiredGroup(graph: Graph, entry: LibraryEntry, consumed: Set<stri
     if (matched) matches.push([...matched].map(id => graph.byId.get(id)!));
   }
   if (matches.length === 0) {
-    const candidate = closestGroup(graph, entry);
+    const candidate = closestGroup(graph, entry, consumed);
     findings.push(finding('error', `MISSING_${code}`, `No intact ${entry.title} group was found.`,
       candidate ? [candidate.id] : [], entry.title,
       candidate ? groupDifferences(graph, entry, candidate) : undefined));
