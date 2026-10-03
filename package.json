@@ -1,0 +1,25 @@
+{
+  "name": "diagram-eval-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/server.js",
+    "start:http": "node dist/src/server.js --http",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "examples": "npm run build && node dist/src/examples.js",
+    "report:examples": "npm run build && node scripts/report-examples.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@xmldom/xmldom": "^0.9.8",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.3.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

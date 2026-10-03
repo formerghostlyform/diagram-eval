@@ -1,0 +1,16 @@
+{
+  "c4-context": {
+    "library": "Libraries/C4 Context.drawio",
+    "labelPolicy": "fixed",
+    "titleStretchIds": ["2", "3", "5"],
+    "titleSampleAllowedFields": ["AuthorTitle"],
+    "warnOnDuplicateEntry": "System"
+  },
+  "c4-container": {
+    "library": "Libraries/C4 Container.drawio",
+    "labelPolicy": "fixed",
+    "titleStretchIds": ["2", "3", "5"],
+    "optionalTitleFields": ["ContainerName"],
+    "titleSampleAllowedFields": ["AuthorTitle"]
+  }
+}
