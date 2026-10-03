@@ -20,14 +20,23 @@ export function styleValue(cell: Cell, key: string): string | undefined {
 
 // draw.io may store text sizing in the cell style or inside its HTML label.
 export function labelsMatchIgnoringFontSize(expected: string | null, actual: string | null): boolean {
-  const normalize = (label: string | null): string | null => label?.replace(
-    /\sstyle\s*=\s*(["'])(.*?)\1/gi,
-    (_attribute, quote: string, value: string) => {
-      const declarations = value.split(';').map(part => part.trim()).filter(Boolean)
-        .filter(part => !/^font-size\s*:/i.test(part));
-      return declarations.length ? ` style=${quote}${declarations.join(';')}${quote}` : '';
-    },
-  ).replace(/(<font\b[^>]*?)\s+size\s*=\s*(["']).*?\2/gi, '$1') ?? null;
+  const normalize = (label: string | null): string | null => {
+    if (label === null) return null;
+    let normalized = label.replace(
+      /\sstyle\s*=\s*(["'])(.*?)\1/gi,
+      (_attribute, quote: string, value: string) => {
+        const declarations = value.split(';').map(part => part.trim()).filter(Boolean)
+          .filter(part => !/^font-size\s*:/i.test(part));
+        return declarations.length ? ` style=${quote}${declarations.join(';')}${quote}` : '';
+      },
+    ).replace(/(<font\b[^>]*?)\s+size\s*=\s*(["']).*?\2/gi, '$1');
+    let previous: string;
+    do {
+      previous = normalized;
+      normalized = normalized.replace(/<(font|span)>((?:(?!<\/?\1\b)[\s\S])*)<\/\1>/gi, '$2');
+    } while (normalized !== previous);
+    return normalized;
+  };
   return normalize(expected) === normalize(actual);
 }
 
