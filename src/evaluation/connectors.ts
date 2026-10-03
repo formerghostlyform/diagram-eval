@@ -43,7 +43,7 @@ export function checkConnectors(graph: Graph, type: DiagramType, consumed: Set<s
   const directed = new Map<string, { forward: Cell[]; backward: Cell[] }>();
   for (const edge of graph.cells.filter(cell => cell.edge && !consumed.has(cell.id))) {
     if (!edge.source || !edge.target) {
-      findings.push(finding('error', 'UNCONNECTED_CONNECTOR', 'Connector is missing a source or target.', [edge.id], 'Arrow'));
+      findings.push(finding('warning', 'UNCONNECTED_CONNECTOR', 'Connector is missing a source or target.', [edge.id], 'Arrow'));
     }
     const badEndpoints = [edge.source, edge.target].filter((id): id is string => !!id)
       .filter(id => !graph.byId.get(id)?.vertex);

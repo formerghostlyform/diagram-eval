@@ -16,21 +16,39 @@ test('MCP tools work over stdio', async () => {
     const list = await client.listTools();
     assert.deepEqual(list.tools.map(tool => tool.name).sort(), ['evaluate_diagram', 'list_diagram_types']);
     assert.ok(list.tools.find(tool => tool.name === 'evaluate_diagram')?.outputSchema);
+    const emptyModel = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>';
     const result = await client.callTool({ name: 'evaluate_diagram', arguments: {
       diagram_type: 'c4-context',
-      diagram_xml: '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>',
+      diagram_xml: emptyModel,
     } });
     const structured = result.structuredContent as {
       diagram_type: string;
       valid: boolean;
+      summary: { passed_checks: string[]; error_count: number; warning_count: number };
       findings: { severity: string; code: string; message: string; cell_ids: string[]; elements: unknown[] }[];
     };
     assert.equal(structured.diagram_type, 'c4-context');
     assert.equal(structured.valid, false);
+    assert.deepEqual(structured.summary, {
+      passed_checks: ['Diagram parsed', 'One diagram page', 'Library shapes conform', 'Connector appearance conforms',
+        'Connector connections conform', 'No duplicate focus entry'],
+      error_count: 2, warning_count: 0,
+    });
     assert.deepEqual(structured.findings.map(item => item.code), ['MISSING_KEY', 'MISSING_TITLE_BLOCK']);
     assert.ok(structured.findings.every(item => item.severity === 'error' && item.message &&
       Array.isArray(item.cell_ids) && Array.isArray(item.elements)));
     assert.deepEqual(JSON.parse((result.content[0] as { text: string }).text), structured);
+    assert.ok((result.content[0] as { text: string }).text.indexOf('"summary"') <
+      (result.content[0] as { text: string }).text.indexOf('"findings"'));
+
+    const multiPage = await client.callTool({ name: 'evaluate_diagram', arguments: {
+      diagram_type: 'c4-context',
+      diagram_xml: `<mxfile><diagram>${emptyModel}</diagram><diagram>${emptyModel}</diagram></mxfile>`,
+    } });
+    const multiPageResult = multiPage.structuredContent as typeof structured;
+    assert.equal(multiPageResult.summary.warning_count, 1);
+    assert.deepEqual(multiPageResult.findings.map(item => [item.severity, item.code]),
+      [['error', 'MISSING_KEY'], ['error', 'MISSING_TITLE_BLOCK'], ['warning', 'MULTI_PAGE']]);
   } finally {
     await client.close();
   }

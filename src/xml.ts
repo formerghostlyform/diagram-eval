@@ -2,7 +2,7 @@ import { inflateRawSync } from 'node:zlib';
 import { DOMParser, type Document, type Element } from '@xmldom/xmldom';
 
 export class InputError extends Error {
-  constructor(public readonly code: string, message: string) {
+  constructor(public readonly code: string, message: string, public readonly pageCount?: number) {
     super(message);
   }
 }
@@ -81,27 +81,32 @@ export function inflateDiagram(encoded: string): string {
   }
 }
 
-export function parseDiagramContent(content: string): Graph {
+export function parseDiagramContent(content: string): { graph: Graph; pageCount: number } {
   const document = parseXml(content);
   const root = document.documentElement!;
-  if (root.tagName === 'mxGraphModel') return parseGraph(root);
+  if (root.tagName === 'mxGraphModel') return { graph: parseGraph(root), pageCount: 1 };
   if (root.tagName !== 'mxfile') {
     throw new InputError('UNSUPPORTED_FORMAT', 'Expected an mxfile or mxGraphModel document.');
   }
   const pages = elementChildren(root).filter(child => child.tagName === 'diagram');
-  if (pages.length !== 1) {
-    throw new InputError('MULTI_PAGE', `Expected one diagram page; found ${pages.length}.`);
-  }
+  if (pages.length === 0) throw new InputError('MALFORMED_XML', 'An mxfile must contain at least one diagram page.');
   const page = pages[0]!;
-  const models = elementChildren(page).filter(child => child.tagName === 'mxGraphModel');
-  if (models.length === 1) return parseGraph(models[0]!);
-  if (models.length > 1) throw new InputError('MALFORMED_XML', 'A page contains multiple graph models.');
-  const decoded = inflateDiagram(page.textContent ?? '');
-  const model = parseXml(decoded).documentElement!;
-  if (model.tagName !== 'mxGraphModel') {
-    throw new InputError('UNSUPPORTED_FORMAT', 'Decoded page is not an mxGraphModel.');
+  try {
+    const models = elementChildren(page).filter(child => child.tagName === 'mxGraphModel');
+    if (models.length === 1) return { graph: parseGraph(models[0]!), pageCount: pages.length };
+    if (models.length > 1) throw new InputError('MALFORMED_XML', 'A page contains multiple graph models.');
+    const decoded = inflateDiagram(page.textContent ?? '');
+    const model = parseXml(decoded).documentElement!;
+    if (model.tagName !== 'mxGraphModel') {
+      throw new InputError('UNSUPPORTED_FORMAT', 'Decoded page is not an mxGraphModel.');
+    }
+    return { graph: parseGraph(model), pageCount: pages.length };
+  } catch (error) {
+    if (error instanceof InputError && pages.length > 1) {
+      throw new InputError(error.code, error.message, pages.length);
+    }
+    throw error;
   }
-  return parseGraph(model);
 }
 
 export function parseGraph(model: Element): Graph {

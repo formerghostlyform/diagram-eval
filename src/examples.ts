@@ -30,6 +30,7 @@ if (process.argv.includes('--json')) {
     for (const item of result.findings) counts.set(item.code, (counts.get(item.code) ?? 0) + 1);
     const summary = [...counts].map(([code, count]) => `${code} ${count}`).join(', ');
     console.log(`${result.valid ? 'PASS' : 'FAIL'} ${name} (${result.diagram_type}): ${errors} errors, ${warnings} warnings`);
+    console.log(`  Passed checks: ${result.summary.passed_checks.join(', ') || 'none'}`);
     if (summary) console.log(`  ${summary}`);
   }
   console.log(`${results.filter(item => item.result.valid).length}/${results.length} examples valid`);

@@ -36,6 +36,11 @@ export interface Finding {
 export interface EvaluationResult {
   diagram_type: string;
   valid: boolean;
+  summary: {
+    passed_checks: string[];
+    error_count: number;
+    warning_count: number;
+  };
   findings: Finding[];
 }
 
@@ -89,7 +94,7 @@ function describeCell(graph: Graph, id: string): FindingElement {
   };
 }
 
-export function finish(diagramType: string, findings: Finding[], graph?: Graph): EvaluationResult {
+export function finish(diagramType: string, findings: Finding[], graph?: Graph, passedChecks: string[] = []): EvaluationResult {
   if (graph) for (const item of findings) {
     const ids = new Set([...item.cell_ids, ...(item.differences ?? []).flatMap(item => item.cell_id ? [item.cell_id] : [])]);
     item.elements = [...ids].map(id => describeCell(graph, id));
@@ -98,7 +103,13 @@ export function finish(diagramType: string, findings: Finding[], graph?: Graph):
     (a.severity === b.severity ? 0 : a.severity === 'error' ? -1 : 1) ||
     a.code.localeCompare(b.code) ||
     a.cell_ids.join(',').localeCompare(b.cell_ids.join(',')));
-  return { diagram_type: diagramType, valid: !findings.some(item => item.severity === 'error'), findings };
+  const errorCount = findings.filter(item => item.severity === 'error').length;
+  return {
+    diagram_type: diagramType,
+    valid: errorCount === 0,
+    summary: { passed_checks: passedChecks, error_count: errorCount, warning_count: findings.length - errorCount },
+    findings,
+  };
 }
 
 function short(value: string | null | undefined): string | undefined {

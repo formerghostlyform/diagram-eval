@@ -102,6 +102,12 @@ test('loads both library types', () => {
 
 test('accepts a valid context diagram and compressed page', () => {
   const fixture = validContext();
+  const result = evaluateDiagram(registry, 'c4-context', fixture.xml());
+  assert.deepEqual(result.summary, {
+    passed_checks: ['Diagram parsed', 'One diagram page', 'One intact Key', 'One intact Title Block with filled metadata',
+      'Library shapes conform', 'Connector appearance conforms', 'Connector connections conform', 'No duplicate focus entry'],
+    error_count: 0, warning_count: 0,
+  });
   assert.deepEqual(codes('c4-context', fixture.xml()), []);
   assert.deepEqual(codes('c4-context', `<mxfile><diagram id="page-1">${fixture.xml()}</diagram></mxfile>`), []);
   assert.deepEqual(codes('c4-context', fixture.compressedXml()), []);
@@ -319,10 +325,37 @@ test('rejects an edge endpoint that cannot be evaluated', () => {
   assert.ok(codes('c4-context', fixture.xml()).includes('INVALID_CONNECTION_ENDPOINT'));
 });
 
-test('rejects malformed and multi-page input', () => {
+test('rejects malformed input and mxfiles without pages', () => {
   assert.deepEqual(codes('c4-context', '<mxfile>'), ['MALFORMED_XML']);
-  assert.deepEqual(codes('c4-context', '<mxfile><diagram/><diagram/></mxfile>'), ['MULTI_PAGE']);
+  assert.deepEqual(codes('c4-context', '<mxfile/>'), ['MALFORMED_XML']);
   assert.deepEqual(codes('missing', validContext().xml()), ['UNKNOWN_DIAGRAM_TYPE']);
+  assert.deepEqual(evaluateDiagram(registry, 'c4-context', '<mxfile>').summary.passed_checks, []);
+});
+
+test('warns about multiple pages and evaluates only the first page', () => {
+  const validPage = validContext().xml();
+  const emptyPage = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>';
+  const firstValid = evaluateDiagram(registry, 'c4-context',
+    `<mxfile><diagram id="first">${validPage}</diagram><diagram id="second">${emptyPage}</diagram></mxfile>`);
+  assert.equal(firstValid.valid, true);
+  assert.deepEqual(firstValid.findings.map(item => [item.severity, item.code]), [['warning', 'MULTI_PAGE']]);
+  assert.match(firstValid.findings[0]!.message, /later pages were not evaluated/);
+  assert.equal(firstValid.summary.warning_count, 1);
+  assert.ok(!firstValid.summary.passed_checks.includes('One diagram page'));
+
+  const firstInvalid = evaluateDiagram(registry, 'c4-context',
+    `<mxfile><diagram id="first">${emptyPage}</diagram><diagram id="second">${validPage}</diagram></mxfile>`);
+  assert.equal(firstInvalid.valid, false);
+  assert.deepEqual(firstInvalid.findings.map(item => item.code), ['MISSING_KEY', 'MISSING_TITLE_BLOCK', 'MULTI_PAGE']);
+
+  const compressedFirst = validContext().compressedXml().replace('</mxfile>',
+    `<diagram id="second">${emptyPage}</diagram></mxfile>`);
+  assert.deepEqual(codes('c4-context', compressedFirst), ['MULTI_PAGE']);
+
+  const malformedFirst = evaluateDiagram(registry, 'c4-context',
+    `<mxfile><diagram>invalid-base64!</diagram><diagram>${validPage}</diagram></mxfile>`);
+  assert.deepEqual(malformedFirst.findings.map(item => [item.severity, item.code]),
+    [['error', 'MALFORMED_XML'], ['warning', 'MULTI_PAGE']]);
 });
 
 test('rejects DOCTYPE and ENTITY declarations as unsafe XML', () => {
@@ -346,12 +379,20 @@ test('rejects nesting deeper than MAX_DEPTH', () => {
   assert.deepEqual(codes('c4-context', xml), ['TOO_DEEP']);
 });
 
-test('rejects an arrow without a target', () => {
-  const fixture = validContext();
-  fixture.cell('arrow-2').removeAttribute('target');
-  const issue = evaluateDiagram(registry, 'c4-context', fixture.xml()).findings.find(item => item.code === 'UNCONNECTED_CONNECTOR');
-  assert.equal(issue?.expected_library_entry, 'Arrow');
-  assert.deepEqual(issue?.cell_ids, ['arrow-2']);
+test('warns about an arrow without a source or target while keeping the diagram valid', () => {
+  for (const endpoint of ['source', 'target']) {
+    const fixture = validContext();
+    fixture.cell('arrow-2').removeAttribute(endpoint);
+    const result = evaluateDiagram(registry, 'c4-context', fixture.xml());
+    const issue = result.findings.find(item => item.code === 'UNCONNECTED_CONNECTOR');
+    assert.equal(issue?.severity, 'warning');
+    assert.equal(issue?.expected_library_entry, 'Arrow');
+    assert.deepEqual(issue?.cell_ids, ['arrow-2']);
+    assert.equal(result.valid, true);
+    assert.equal(result.summary.error_count, 0);
+    assert.equal(result.summary.warning_count, 1);
+    assert.ok(!result.summary.passed_checks.includes('Connector connections conform'));
+  }
 });
 
 test('accepts font-size markup around part of a library shape label', () => {

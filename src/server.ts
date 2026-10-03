@@ -11,6 +11,11 @@ const registry = new TypeRegistry();
 const evaluationOutputSchema = z.object({
   diagram_type: z.string(),
   valid: z.boolean(),
+  summary: z.object({
+    passed_checks: z.array(z.string()),
+    error_count: z.number().int().nonnegative(),
+    warning_count: z.number().int().nonnegative(),
+  }),
   findings: z.array(z.object({
     severity: z.enum(['error', 'warning']),
     code: z.string(),
@@ -52,7 +57,7 @@ export function buildServer(): McpServer {
     return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], structuredContent: result };
   });
   server.registerTool('evaluate_diagram', {
-    description: 'Evaluate a single-page draw.io diagram against a configured shape library and connection rules.',
+    description: 'Evaluate the first page of a draw.io diagram against a configured shape library and connection rules; warn when more pages exist.',
     inputSchema: z.object({
       diagram_type: z.string().min(1),
       diagram_xml: z.string().min(1),

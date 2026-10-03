@@ -23,7 +23,7 @@ The endpoint is `http://127.0.0.1:3000/mcp`. It binds only to loopback and valid
 ## Tools
 
 - `list_diagram_types()` lists type IDs, library entry names, and label policy.
-- `evaluate_diagram({ "diagram_type": "c4-context", "diagram_xml": "<mxGraphModel>...</mxGraphModel>" })` accepts inline, editable draw.io XML. It supports a standalone `<mxGraphModel>` or an `<mxfile>` containing exactly one compressed or uncompressed `<diagram>` page. It does not accept image-only exports.
+- `evaluate_diagram({ "diagram_type": "c4-context", "diagram_xml": "<mxGraphModel>...</mxGraphModel>" })` accepts inline, editable draw.io XML. It supports a standalone `<mxGraphModel>` or an `<mxfile>` with compressed or uncompressed `<diagram>` pages. If an `<mxfile>` has multiple pages, the tool evaluates the first and emits a `MULTI_PAGE` warning; later pages are not evaluated. It does not accept image-only exports.
 
 The tool advertises this output schema and returns it in both MCP `structuredContent` and JSON text:
 
@@ -31,6 +31,11 @@ The tool advertises this output schema and returns it in both MCP `structuredCon
 {
   "diagram_type": "c4-context",
   "valid": false,
+  "summary": {
+    "passed_checks": ["Diagram parsed", "One diagram page", "One intact Key", "One intact Title Block with filled metadata"],
+    "error_count": 1,
+    "warning_count": 0
+  },
   "findings": [
     {
       "severity": "error",
@@ -45,7 +50,7 @@ The tool advertises this output schema and returns it in both MCP `structuredCon
 }
 ```
 
-The `findings` array contains every issue detected by the configured rules, with one entry per finding. `elements` gives the cell ID, readable name and type when available, parent ID, geometry, and connector endpoint IDs and names. Geometry coordinates may be relative to the parent group. `expected_library_entry` and `differences` identify the closest library template and mismatched properties when possible. `cell_ids` is deprecated in favor of `elements`. An error makes `valid` false; warnings alone keep it true. Malformed input and unknown types are returned as evaluation findings so callers receive the same result shape; malformed XML cannot be checked further.
+The `summary` lists checks that completed without findings before the detailed failures and warnings, plus counts for each severity. It lists no passed checks when the diagram type is unknown or input cannot be fully evaluated. The `findings` array contains every issue detected by the configured rules, with one entry per finding. `elements` gives the cell ID, readable name and type when available, parent ID, geometry, and connector endpoint IDs and names. Geometry coordinates may be relative to the parent group. `expected_library_entry` and `differences` identify the closest library template and mismatched properties when possible. `cell_ids` is deprecated in favor of `elements`. An error makes `valid` false; warnings alone keep it true. Malformed input and unknown types are returned as evaluation findings so callers receive the same result shape; malformed XML cannot be checked further.
 
 ## Rules
 
@@ -53,7 +58,7 @@ The selected library must contain exactly one intact `Key` and `Title Block`, in
 
 Ordinary library shapes must retain their visual style and embedded image or stencil content, except that font sizes may change in the cell style or HTML label. Their width and height may change unless the library style explicitly sets `resizable=0`. Placement, IDs, and metadata values may change. Editor-only style keys on shapes without images are ignored. Other label markup is fixed by default. Key and Title Block font sizes remain strict. Standalone text labels and unstyled groups used to organize child cells are accepted. Clearly foreign shapes and images produce warnings; cells retaining C4 metadata or the library's `metaEdit` marker while differing from a template produce errors. XML does not carry a trustworthy provenance marker, so a shape stripped of all identifying data may be indistinguishable from a foreign shape.
 
-Connectors must match the library `Arrow` stroke width, stroke color, and arrowhead style (head type, fill, and size). Their labels, other styles, endpoints, and routing may change. A connector with arrowheads at both ends, or a pair of opposing A→B and B→A connectors, is an error. The arrow inside the intact Key is excluded. On `c4-context`, more than one matching blue `System` in the diagram body produces a warning; blue Container entries do not trigger that rule.
+Connectors must match the library `Arrow` stroke width, stroke color, and arrowhead style (head type, fill, and size). Their labels, other styles, endpoints, and routing may change. A connector without a source or target produces a warning. A connector with arrowheads at both ends, or a pair of opposing A→B and B→A connectors, is an error. The arrow inside the intact Key is excluded. On `c4-context`, more than one matching blue `System` in the diagram body produces a warning; blue Container entries do not trigger that rule.
 
 ## Add a diagram type
 
