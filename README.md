@@ -1,4 +1,4 @@
-# Diagram evaluator MCP server
+# Diagram Evaluator MCP Server
 
 This server checks one editable draw.io diagram against the selected exported shape library. It ships with `c4-context` and `c4-container`, using the files in `Libraries/` as the source of truth. Evaluation is deterministic and does not render the diagram or call an AI model.
 
